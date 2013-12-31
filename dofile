@@ -1,0 +1,40 @@
+[Alias]
+NAME=libmule
+LIBKADDIR=.
+[CLangCompiler]
+SOURCES=@sources@
+OBJDIR=./obj/
+INCLUDE=./src;./extrn/polarssl/include;./extrn/common-code
+KEYS=-fshort-wchar -fPIC -fpack-struct=1
+DEFINE=POLARSSL_HAVEGE_C POLARSSL_MD4_C
+Debug:
+KEYS=-ggdb
+Verbose:
+DEFINE=CONFIG_VERBOSE
+Profile:
+DEFINE=EXIT_TIMER
+Daemon:
+DEFINE=RUN_AS_DAEMON
+[CLangLinker]
+TARGETNAME=$NAME$.so
+TARGETDIR=./bin/
+Shared:
+KEYS= -shared
+[Archiver]
+TARGETNAME=$NAME$.a
+TARGETDIR=./bin/
+[Deployer]
+./bin/$NAME$.a=../kad/lib/$NAME$.a
+./src/$NAME$.h=../kad/src/libkad/$NAME$.h
+[Cleaner]
+DIRS=./;./obj/;./bin/
+EXTS=*.o;*.dat;*.a
+
+Build >> [CLangCompiler,CLangLinker,Archiver,Deployer]
+Rebuild >> [Cleaner,CLangCompiler,CLangLinker,Archiver,Deployer]
+Clean >> [Cleaner]
+
+rb == [Rebuild Debug Verbose Shared]
+hush == [Build Debug Shared]
+rbhush == [Rebuild Debug Shared]
+default == [Build Debug Verbose Shared]

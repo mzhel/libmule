@@ -1,0 +1,26 @@
+ $LIBKADDIR$/src/uint128.c \
+ $LIBKADDIR$/extrn/polarssl/library/havege.c \
+ $LIBKADDIR$/extrn/polarssl/library/timing.c \
+ $LIBKADDIR$/extrn/polarssl/library/md4.c \
+ $LIBKADDIR$/extrn/polarssl/library/md5.c \
+ $LIBKADDIR$/extrn/polarssl/library/arc4.c \
+ $LIBKADDIR$/extrn/common-code/list.c \
+ $LIBKADDIR$/extrn/common-code/queue.c \
+ $LIBKADDIR$/extrn/common-code/mem.c \
+ $LIBKADDIR$/extrn/common-code/log.c \
+ $LIBKADDIR$/extrn/zlib/compress.c \
+ $LIBKADDIR$/extrn/zlib/uncompr.c \
+ $LIBKADDIR$/extrn/zlib/gzclose.c \
+ $LIBKADDIR$/extrn/zlib/gzlib.c \
+ $LIBKADDIR$/extrn/zlib/gzread.c \
+ $LIBKADDIR$/extrn/zlib/gzwrite.c \
+ $LIBKADDIR$/extrn/zlib/adler32.c \
+ $LIBKADDIR$/extrn/zlib/crc32.c \
+ $LIBKADDIR$/extrn/zlib/deflate.c \
+ $LIBKADDIR$/extrn/zlib/infback.c \
+ $LIBKADDIR$/extrn/zlib/inffast.c \
+ $LIBKADDIR$/extrn/zlib/inflate.c \
+ $LIBKADDIR$/extrn/zlib/inftrees.c \
+ $LIBKADDIR$/extrn/zlib/trees.c \
+ $LIBKADDIR$/extrn/zlib/zutil.c 
+

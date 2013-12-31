@@ -1,0 +1,12 @@
+*.*
+!.gitignore
+!*.h
+!*.c
+!*.cpp
+!*.asm
+!*.inc
+!*.cmd
+!*.def
+!dofile
+!Doxyfile
+
