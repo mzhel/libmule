@@ -1,13 +1,23 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include <memory.h>
+#ifdef CONFIG_VERBOSE
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
+#include <uint128.h>
+#include <list.h>
+#include <queue.h>
+#include <mule.h>
 #include <random.h>
 #include <ticks.h>
 #include <pktasm.h>
 #include <mulesrc.h>
 #include <mem.h>
-#include <list.h>
-#include <queue.h>
 #include <log.h>
+#include <polarssl/md5.h>
 
 bool
 mule_source_create(
@@ -22,12 +32,15 @@ mule_source_create(
 {
   bool result = false;
   MULE_SOURCE* msc = NULL;
+#ifdef CONFIG_VERBOSE
+  struct in_addr in;
+#endif
 
   do {
 
     if (!msc_out) break;
 
-    msc = mem_alloc(MULE_SOURCE*)mem_alloc(sizeof(MULE_SOURCE));
+    msc = (MULE_SOURCE*)mem_alloc(sizeof(MULE_SOURCE));
 
     if (!msc){
 
@@ -59,6 +72,12 @@ mule_source_create(
 
     pktasm_create((PKT_ASM**)&msc->pkt_asm);
 
+#ifdef CONFIG_VERBOSE
+    in.s_addr = ip4_no;
+
+    strcpy(msc->ip4_str, inet_ntoa(in));
+#endif 
+
     *msc_out = msc;
 
     result = true;
@@ -83,9 +102,9 @@ mule_source_destroy(
 
     queue_destroy(msc->actions);
 
-    if (msc->dl_info.parts_status) mem_free(ks->dl_info.parts_status);
+    if (msc->dl_info.parts_status) mem_free(msc->dl_info.parts_status);
 
-    if (msc->dl_info.parts_hash) mem_free(ks->dl_info.parts_hash);
+    if (msc->dl_info.parts_hash) mem_free(msc->dl_info.parts_hash);
 
     list_destroy(msc->dl_info.req_blocks, true);
 
@@ -173,7 +192,7 @@ mule_source_type_set(
 
   do {
 
-    if (!msc || !(msc->type & flag)) break;
+    if (!msc || !(msc->type & type)) break;
 
     result = true;
 
@@ -221,6 +240,7 @@ mule_source_copy(
   return result;
 }
 
+/*
 bool
 mule_source_new_download(
                          MULE_SOURCE* msc,
@@ -354,7 +374,7 @@ mule_source_get_part_to_download(
 
   return result;
 }
-
+*/
 bool
 mule_source_set_cipher(
                        MULE_SOURCE* msc

@@ -1,4 +1,17 @@
+ $LIBKADDIR$/src/muleses.c \
+ $LIBKADDIR$/src/muleqpkt.c \
+ $LIBKADDIR$/src/mulepkt.c \
+ $LIBKADDIR$/src/mulesrc.c \
+ $LIBKADDIR$/src/mulehlp.c \
+ $LIBKADDIR$/src/muleproto.c \
+ $LIBKADDIR$/src/packet.c \
+ $LIBKADDIR$/src/pktasm.c \
+ $LIBKADDIR$/src/tag.c \
+ $LIBKADDIR$/src/taglst.c \
+ $LIBKADDIR$/src/str.c \
+ $LIBKADDIR$/src/random.c \
  $LIBKADDIR$/src/uint128.c \
+ $LIBKADDIR$/src/ticks.c \
  $LIBKADDIR$/extrn/polarssl/library/havege.c \
  $LIBKADDIR$/extrn/polarssl/library/timing.c \
  $LIBKADDIR$/extrn/polarssl/library/md4.c \

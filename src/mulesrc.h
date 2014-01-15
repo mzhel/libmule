@@ -16,12 +16,14 @@
 #define MULE_SOURCE_STATE_DOWNLOADING               9
 #define MULE_SOURCE_STATE_TIMEOUT_BEFORE_DONE       10
 #define MULE_SOURCE_STATE_ACTION_DONE               11
-#define MULE_SOURCE_STATE_DISCONNECTED              12
+#define MULE_SOURCE_STATE_DISCONNECT_QUEUED         12
+#define MULE_SOURCE_STATE_DISCONNECTED              13
 
 #define MULE_SOURCE_ACTION_IDLE         0
 #define MULE_SOURCE_ACTION_UDP_FW_CHECK 1
 #define MULE_SOURCE_ACTION_FW_CHECK     2
 #define MULE_SOURCE_ACTION_DOWNLOAD     3
+#define MULE_SOURCE_ACTION_DISCONNECT   4
 
 #define MULE_SOURCE_DIRECTION_IN        1
 #define MULE_SOURCE_DIRECTION_OUT       2
@@ -40,6 +42,8 @@
 #define MULE_SOURCE_USER_HASH_LEN     16
 #define MULE_SOURCE_MAX_USER_NICK_LEN 15
 #define MULE_SOURCE_MAX_FILE_NAME_LEN 255
+
+#define MULE_SOURCE_INACTIVITY_TIMEOUT_MS 25000
 
 #define MULE_SOURCE_FLAG_FILE_NAME    1
 #define MULE_SOURCE_FLAG_FILE_STATUS  2
@@ -83,7 +87,7 @@ typedef struct _mule_source_download_info {
   uint8_t* parts_status; // Bitmap describing parts status.
   UINT128* parts_hash; // Array of hashes for each part.
   SENT_PART sent_part;
-  LIST* req_blocks
+  LIST* req_blocks;
 } MULE_SOURCE_DOWNLOAD_INFO;
 
 typedef struct _mule_source_action {
@@ -129,9 +133,71 @@ typedef struct _mule_source {
   uint32_t timeout;
   MULE_SOURCE_INFO info;
   void* pkt_asm;
-  MULE_SOURCE_DOWNLOAD_INFO;
+  MULE_SOURCE_DOWNLOAD_INFO dl_info;
+  void* fd;
+#ifdef CONFIG_VERBOSE
+  char ip4_str[32];
+#endif
 } MULE_SOURCE;
 
+bool
+mule_source_create(
+                   uint8_t access,
+                   UINT128* id,
+                   uint32_t ip4_no,
+                   uint16_t tcp_port_no,
+                   uint16_t udp_port_no,
+                   uint8_t cipher_opts,
+                   MULE_SOURCE** msc_out
+                  );
 
+bool
+mule_source_destroy(
+                    MULE_SOURCE* msc
+                   );
+
+bool
+mule_source_set_direction(
+                          MULE_SOURCE* msc,
+                          uint8_t direction
+                         );
+
+bool
+mule_source_add_type(
+                     MULE_SOURCE* msc,
+                     uint8_t type
+                    );
+
+bool
+mule_source_remove_type(
+                        MULE_SOURCE* msc,
+                        uint8_t type
+                       );
+
+bool
+mule_source_type_set(
+                     MULE_SOURCE* msc,
+                     uint8_t type
+                    );
+
+bool
+mule_source_copy(
+                 MULE_SOURCE* msc_src,
+                 MULE_SOURCE** msc_dst_out
+                );
+
+bool
+mule_source_queue_action(
+                         MULE_SOURCE* msc,
+                         uint8_t type,
+                         void* arg
+                        );
+
+bool
+mule_source_dequeue_action(
+                           MULE_SOURCE* msc,
+                           uint8_t* action_out,
+                           void** arg_out
+                          );
 
 #endif // _MULESRC_H_

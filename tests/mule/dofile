@@ -1,0 +1,39 @@
+[Alias]
+TEST_NAME=mule_tests
+LIBKADDIR=../..
+[CLangCompiler]
+SOURCES=$TEST_NAME$.c \
+        @../../sources@ \
+        ../../src/cmockery/cmockery.c
+OBJDIR=./obj/
+INCLUDE=../../src;../../extrn/polarssl/include;../../src/cmockery/google;../../extrn/common-code
+KEYS=-fshort-wchar
+DEFINE=POLARSSL_HAVEGE_C POLARSSL_MD4_C
+Release:
+KEYS=-fpack-struct=1
+Debug:
+KEYS=-ggdb -fpack-struct=1 
+Verbose:
+DEFINE=CONFIG_VERBOSE
+Profile:
+DEFINE=EXIT_TIMER
+Daemon:
+DEFINE=RUN_AS_DAEMON
+[CLangLinker]
+TARGETNAME=$TEST_NAME$
+TARGETDIR=../../bin/
+LIBS= cgraph cdt
+Shared:
+LIBS= c rt
+Static:
+LIBS=c rt
+[Cleaner]
+DIRS=./;./obj/
+EXTS=*.o;*.dat
+
+Build >> [CLangCompiler,CLangLinker]
+Rebuild >> [Cleaner,CLangCompiler,CLangLinker]
+Clean >> [Cleaner]
+
+default == [Build Debug Verbose]
+rb == [Rebuild Debug Verbose]

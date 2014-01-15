@@ -1,27 +1,25 @@
-#ifndef _MULESES_H_
-#define _MULESES_H_
+#ifndef _LIBMULE_H_
+#define _LIBMULE_H_
 
-#define MAX_NICK_LEN 15
+#ifndef KAD_SESSION_STATUS_DEFINED
+#define KAD_SESSION_STATUS_DEFINED
 
-#define PACKET_QUEUE_LENGTH 64
-
-#define PACKET_ACTION_CONNECT    1
-#define PACKET_ACTION_SEND_DATA  2
-#define PACKET_ACTION_PARSE_DATA 3
-#define PACKET_ACTION_DISCONNECT 4
-
-typedef struct _kad_status {
+typedef struct _kad_session_status {
   uint8_t version;
   uint16_t udp_port;
   uint16_t ext_udp_port;
   bool fw;
   bool fw_udp;
   uint32_t pub_ip4_no;
-} KAD_STATUS;
+} KAD_SESSION_STATUS;
+
+#endif
+
+typedef struct _mule_session MULE_SESSION;
 
 // Kad callbacks prototypes.
 
-typedef bool (*KAD_GET_STATUS)(void* ks, KAD_STATUS* kss);
+typedef bool (*KAD_GET_STATUS)(void* ks, KAD_SESSION_STATUS* kss);
 
 typedef bool (*KAD_CALC_VERIFY_KEY)(void* ks, uint32_t ip4_no, uint32_t* key_out);
 
@@ -47,14 +45,6 @@ typedef struct mule_network_callbacks {
   DISCONNECT disconnect;
 } MULE_NETWORK_CALLBACKS;
 
-typedef struct _mule_sesssion_timers {
-  uint32_t manage_sources;
-  uint32_t manage_inactive_sources;
-  uint32_t remove_disconnected_sources;
-  uint32_t handle_in_packets;
-  uint32_t handle_out_packets;
-} MULE_SESSION_TIMERS;
-
 typedef struct _kad_callbacks {
   KAD_GET_STATUS kad_get_status;
   KAD_CALC_VERIFY_KEY kad_calc_verify_key;
@@ -63,20 +53,6 @@ typedef struct _kad_callbacks {
   KAD_FW_DEC_CHECKS_RUNNING kad_fw_dec_checks_running;
   KAD_FW_DEC_CHECKS_RUNNING_UDP kad_fw_dec_checks_running_udp;
 } KAD_CALLBACKS;
-
-typedef struct _mule_session {
-  uint16_t tcp_port;
-  char nick[MAX_NICK_LEN + 1];
-  LIST* sources;
-  UINT128 user_hash;
-  QUEUE* queue_in_pkt;
-  QUEUE* queue_out_pkt;
-  void* kad_session;
-  KAD_CALLBACKS kcbs;
-  void* net_handle;
-  MULE_NETWORK_CALLBACKS ncbs;
-  MULE_SESSION_TIMERS timers;
-} MULE_SESSION;
 
 bool
 mule_session_init(
@@ -104,38 +80,6 @@ mule_session_set_network_callbacks(
                                   );
 
 bool
-mule_session_create_queue_out_pkt(
-                                  MULE_SESSION* ms,
-                                  uint8_t action,
-                                  uint32_t ip4_no,
-                                  uint16_t port_no,
-                                  void* fd,
-                                  uint8_t* pkt,
-                                  uint32_t pkt_len
-                                  );
-
-bool
-mule_session_global_source_by_ip_port(
-                                      MULE_SESSION* ms,
-                                      uint32_t ip4_no,
-                                      uint16_t port_no,
-                                      MULE_SOURCE** msc_out
-                                     );
-
-bool
-mule_session_global_source_by_fd(
-                                 MULE_SESSION* ms,
-                                 void* fd,
-                                 MULE_SOURCE** msc_out
-                                 );
-
-bool
-mule_session_add_global_source(
-                               MULE_SESSION* ms,
-                               MULE_SOURCE* msc
-                              );
-
-bool
 mule_session_new_connection(
                             MULE_SESSION* ms,
                             uint32_t ip4_no,
@@ -144,16 +88,16 @@ mule_session_new_connection(
                            );
 
 bool
-mule_session_connected_to_peer(
+mule_session_peer_disconnected(
                                MULE_SESSION* ms,
-                               uint32_t ip4_no,
-                               uint16_t port_no,
                                void* fd
                               );
 
 bool
-mule_session_peer_disconnected(
+mule_session_connected_to_peer(
                                MULE_SESSION* ms,
+                               uint32_t ip4_no,
+                               uint16_t port_no,
                                void* fd
                               );
 
@@ -170,12 +114,13 @@ mule_session_timer(
                    MULE_SESSION* ms
                   );
 
-#define QUEUE_IN_PKT(ms, p) queue_enq(ms->queue_in_pkt, p)
+bool
+mule_session_add_source_for_udp_fw_check(
+                                         MULE_SESSION* ms,
+                                         void* id,
+                                         uint32_t ip4_no,
+                                         uint16_t tcp_port_no,
+                                         uint16_t udp_port_no
+                                        );
 
-#define DEQ_IN_PKT(ms, pp) queue_deq(ms->queue_in_pkt, pp)
-
-#define QUEUE_OUT_PKT(ms, p) queue_enq(ms->queue_out_pkt, p)
-
-#define DEQ_OUT_PKT(ms, pp) queue_deq(ms->queue_out_pkt, pp)
-
-#endif // _MULESES_H_
+#endif // _LIBMULE_H_
