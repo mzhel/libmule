@@ -23,6 +23,10 @@ tag_list_emit(
   uint32_t t_len = 0;
   bool failed = false;
   uint32_t t_cnt = 0;
+  uint32_t bytes_emited = 0;
+#ifdef CONFIG_VERBOSE
+  uint32_t len_before;
+#endif
 
   do {
 
@@ -54,6 +58,8 @@ tag_list_emit(
 
       tag_calc_buf_size(t, &t_len);
 
+      LOG_DEBUG("t_len = %.8x", t_len);
+
       if (rem_len < t_len){
 
         failed = true;
@@ -62,7 +68,13 @@ tag_list_emit(
 
       }
 
-      if (!tag_emit(t, p, rem_len, &p, &rem_len)){
+#ifdef CONFIG_VERBOSE
+
+      len_before = rem_len;
+
+#endif
+
+      if (!tag_emit(t, p, rem_len, &p, &bytes_emited)){
 
         LOG_ERROR("Failed to emit tag from list.");
 
@@ -71,6 +83,10 @@ tag_list_emit(
         break;
 
       }
+
+      LOG_DEBUG("emited_len = %.8x", bytes_emited);
+
+      rem_len -= bytes_emited;
 
     LIST_EACH_ENTRY_WITH_DATA_END(e);
 

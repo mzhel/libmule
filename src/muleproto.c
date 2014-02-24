@@ -98,7 +98,7 @@ mule_proto_hello(
 
       rem_len -= tag_len;
 
-      if (tag_get_id(tag, &tag_id)){
+      if (!tag_get_id(tag, &tag_id)){
 
         LOG_ERROR("Failed to get tag id.");
 
@@ -364,7 +364,7 @@ mule_proto_handle_donkey_packet(
 
     pkt = raw_pkt + 6;
 
-    pkt_len = *((uint32_t*)(raw_pkt + 1)) - 1; // minus one because encoded packet length includes opcode byte
+    pkt_len = *((uint32_t*)(raw_pkt + 1)) - 1; // minus one because encoded packet length include opcode byte
 
     if (!msc && op != OP_HELLO){
 
@@ -384,7 +384,17 @@ mule_proto_handle_donkey_packet(
 
         LOG_DEBUG("%s", answer?"OP_HELLOANSWER":"OP_HELLO");
 
-        mule_proto_hello(ms, msc, answer, pkt, pkt_len);
+        if (!mule_proto_hello(ms, msc, answer, pkt, pkt_len)) break;
+
+        if (msc->udp_port_no && ms->kcbs.kad_bootstrap_from_node){
+
+          ms->kcbs.kad_bootstrap_from_node(ms->kad_session, msc->ip4_no, msc->udp_port_no);
+
+        }
+
+        msc->state = MULE_SOURCE_STATE_HELLO_RECEIVED;
+
+        msc->done = true;
 
       break;
 
@@ -432,6 +442,10 @@ mule_proto_handle_ext_packet(
       case OP_KAD_FWTCPCHECK_ACK:
 
         if (ms->kad_session && ms->kcbs.kad_fw_check_response) ms->kcbs.kad_fw_check_response(ms->kad_session);
+
+        msc->state = MULE_SOURCE_STATE_ACTION_DONE;
+
+        msc->done = true;
         
       break;
 

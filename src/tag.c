@@ -152,7 +152,7 @@ tag_string_create(
 
     *((uint16_t*)pout) = (uint16_t)val_len;
 
-    str_utf8_to_unicode(val, val_len, (wchar_t*)(pout + 2), *((uint16_t*)pout) * 2);
+    str_utf8_to_unicode(val, val_len, (wchar_t*)(pout + 2), *((uint16_t*)pout) * 2, NULL);
 
     *tag_out = tag;
     
@@ -302,6 +302,7 @@ tag_emit(
   bool result = false;
   uint32_t calc_size = 0;
   uint8_t* p = NULL;
+  uint32_t str_len = 0;
 
   do {
 
@@ -345,8 +346,11 @@ tag_emit(
                             ((TAG_STRING*)((uint8_t*)tag + tag->data_offset))->data,
                             ((TAG_STRING*)((uint8_t*)tag + tag->data_offset))->len,
                             (char*)p,
-                            ((TAG_STRING*)((uint8_t*)tag + tag->data_offset))->len
+                            ((TAG_STRING*)((uint8_t*)tag + tag->data_offset))->len,
+                            &str_len
                            );
+
+        p += str_len;
 
       break;
 
@@ -537,6 +541,7 @@ tag_read(
   uint8_t* pout = NULL;
   uint8_t type = 0;
   uint32_t i = 0;
+  uint32_t io_bytes = 0;
 
   do {
 
@@ -620,7 +625,8 @@ tag_read(
                             (char*)(p + 2),
                             *(uint16_t*)p,
                             (wchar_t*)(pout + 2),
-                            *((uint16_t*)pout) * 2
+                            *((uint16_t*)pout) * 2,
+                            &io_bytes
                             );
 
         p += sizeof(uint16_t) + *(uint16_t*)p;
@@ -760,7 +766,8 @@ tag_string_get_data(
                              ((TAG_STRING*)((uint8_t*)tag + tag->data_offset))->data,
                              ((TAG_STRING*)((uint8_t*)tag + tag->data_offset))->len,
                              (char*)buf,
-                             buf_len
+                             buf_len,
+                             NULL
                             )
     ){
 

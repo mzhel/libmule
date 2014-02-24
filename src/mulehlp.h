@@ -12,6 +12,11 @@ mulehlp_destroy_out_pkt_queue(
                              );
 
 bool
+mulehlp_destroy_sources_list(
+                             MULE_SESSION* ms
+                            );
+
+bool
 mulehlp_queue_hello_pkt(
                         MULE_SESSION* ms,
                         MULE_SOURCE* msc,

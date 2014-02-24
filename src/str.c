@@ -11,12 +11,14 @@ str_unicode_to_utf8(
                     wchar_t* uc_str,
                     size_t uc_str_len,
                     char* res_buf,
-                    size_t res_buf_len
+                    size_t res_buf_len,
+                    uint32_t* emited_len_out
                    )
 {
   bool result = false;
   iconv_t ic = (iconv_t)-1;
   size_t uc_bytes_len = 0;
+  size_t buf_len = 0;
 
   do {
 
@@ -34,13 +36,19 @@ str_unicode_to_utf8(
 
     }
 
+    buf_len = res_buf_len;
+
     if (-1 == iconv(ic, (char**)&uc_str, (size_t*)&uc_bytes_len, &res_buf, (size_t*)&res_buf_len)) {
 
-      LOG_ERROR("iconv failed, error code %d.", errno);
+      LOG_ERROR("iconv failed, error code %s (%d).", strerror(errno), errno);
 
       break;
 
     }
+
+    LOG_DEBUG("res_buf_len = %.8x, buf_len = %.8x", res_buf_len, buf_len);
+
+    if (emited_len_out) *emited_len_out = buf_len - res_buf_len;
 
     result = true;
 
@@ -56,11 +64,14 @@ str_utf8_to_unicode(
                     char* in_str,
                     size_t in_str_len,
                     wchar_t* out_buf,
-                    size_t out_buf_len
+                    size_t out_buf_len,
+                    uint32_t* read_len_out
                    )
 {
   bool result = false;
   iconv_t ic = (iconv_t)-1;
+  uint32_t read_len = 0;
+  uint32_t out_buf_len_base = 0;
 
   do {
 
@@ -78,13 +89,17 @@ str_utf8_to_unicode(
 
     out_buf_len = out_buf_len *sizeof(wchar_t);
 
+    out_buf_len_base = out_buf_len;
+
     if (-1 == iconv(ic, &in_str, &in_str_len, (char**)&out_buf, &out_buf_len)) {
 
-      LOG_ERROR("iconv failed, error code %d.", errno);
+      LOG_ERROR("iconv failed, error code %s (%d).", strerror(errno), errno);
 
       break;
 
     }
+
+    if (read_len_out) *read_len_out = out_buf_len_base - out_buf_len;
 
     result = true;
 

@@ -12,6 +12,7 @@
  $LIBKADDIR$/src/random.c \
  $LIBKADDIR$/src/uint128.c \
  $LIBKADDIR$/src/ticks.c \
+ $LIBKADDIR$/src/muledbg.c \
  $LIBKADDIR$/extrn/polarssl/library/havege.c \
  $LIBKADDIR$/extrn/polarssl/library/timing.c \
  $LIBKADDIR$/extrn/polarssl/library/md4.c \

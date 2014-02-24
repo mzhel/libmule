@@ -15,7 +15,12 @@ typedef struct _kad_session_status {
 
 #endif
 
+#ifndef MULE_SESSION_DEFINED
+#define MULE_SESSION_DEFINED
+
 typedef struct _mule_session MULE_SESSION;
+
+#endif
 
 // Kad callbacks prototypes.
 
@@ -24,6 +29,8 @@ typedef bool (*KAD_GET_STATUS)(void* ks, KAD_SESSION_STATUS* kss);
 typedef bool (*KAD_CALC_VERIFY_KEY)(void* ks, uint32_t ip4_no, uint32_t* key_out);
 
 typedef bool (*KAD_SEND_FW_CHECK_UDP)(void* ks, uint16_t check_port, uint32_t key, uint32_t ip4_no);
+
+typedef bool (*KAD_BOOTSTRAP_FROM_NODE)(void* ks, uint32_t ip4_no, uint16_t port_no);
 
 typedef bool (*KAD_FW_CHECK_RESPONSE)(void* ks);
 
@@ -48,6 +55,7 @@ typedef struct mule_network_callbacks {
 typedef struct _kad_callbacks {
   KAD_GET_STATUS kad_get_status;
   KAD_CALC_VERIFY_KEY kad_calc_verify_key;
+  KAD_BOOTSTRAP_FROM_NODE kad_bootstrap_from_node;
   KAD_SEND_FW_CHECK_UDP kad_send_fw_check_udp;
   KAD_FW_CHECK_RESPONSE kad_fw_check_response;
   KAD_FW_DEC_CHECKS_RUNNING kad_fw_dec_checks_running;
@@ -116,6 +124,15 @@ mule_session_timer(
 
 bool
 mule_session_add_source_for_udp_fw_check(
+                                         MULE_SESSION* ms,
+                                         void* id,
+                                         uint32_t ip4_no,
+                                         uint16_t tcp_port_no,
+                                         uint16_t udp_port_no
+                                        );
+
+bool
+mule_session_add_source_for_tcp_fw_check(
                                          MULE_SESSION* ms,
                                          void* id,
                                          uint32_t ip4_no,

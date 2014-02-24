@@ -100,6 +100,8 @@ mule_source_destroy(
 
     if (!msc) break;
 
+    while(mule_source_dequeue_action(msc, NULL, NULL));
+
     queue_destroy(msc->actions);
 
     if (msc->dl_info.parts_status) mem_free(msc->dl_info.parts_status);

@@ -16,6 +16,7 @@
 #include <pktasm.h>
 #include <ticks.h>
 #include <random.h>
+#include <muledbg.h>
 #include <mem.h>
 #include <log.h>
 
@@ -71,6 +72,7 @@ mule_session_init(
   return result;
 }
 
+
 bool
 mule_session_uninit(
                     MULE_SESSION* ms
@@ -85,6 +87,8 @@ mule_session_uninit(
     mulehlp_destroy_in_pkt_queue(ms);
 
     mulehlp_destroy_out_pkt_queue(ms);
+
+    mulehlp_destroy_sources_list(ms);
 
     mem_free(ms);
 
@@ -191,7 +195,7 @@ mule_session_global_source_by_fd(
 {
   bool result = false;
   MULE_SOURCE* msc = NULL;
-  bool found = true;
+  bool found = false;
 
   do {
 
@@ -219,6 +223,47 @@ mule_session_global_source_by_fd(
 
   return result;
 }
+
+bool
+mule_session_global_source_by_ip_and_direction(
+                                               MULE_SESSION* ms,
+                                               uint32_t ip4_no,
+                                               uint8_t direction,
+                                               MULE_SOURCE** msc_out
+                                              )
+{
+  bool result = false;
+  MULE_SOURCE* msc = NULL;
+  bool found = true;
+
+  do {
+
+    if (!ms || !msc_out) break;
+
+    LIST_EACH_ENTRY_WITH_DATA_BEGIN(ms->sources, e, msc);
+
+      if (ip4_no == msc->ip4_no && direction == msc->direction){
+
+        found = true;
+
+        break;
+
+      }
+
+    LIST_EACH_ENTRY_WITH_DATA_END(e);
+
+    if (!found) break;
+
+    *msc_out = msc;
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+
 bool
 mule_session_add_global_source(
                                MULE_SESSION* ms,
@@ -230,6 +275,8 @@ mule_session_add_global_source(
   do {
 
     if (!ms || !msc) break;
+
+    LOG_DEBUG("Adding global source %s:%d", msc->ip4_str, ntohs(msc->tcp_port_no));
 
     if (!list_add_entry(&ms->sources, msc)){
 
@@ -369,7 +416,36 @@ mule_session_disconnect_inactive_sources(
 
       if (now - msc->last_action_time > MULE_SOURCE_INACTIVITY_TIMEOUT_MS){
 
-        mule_source_queue_action(msc, MULE_SOURCE_ACTION_DISCONNECT, NULL);
+        if (msc->state == MULE_SOURCE_STATE_NEW || msc->state == MULE_SOURCE_STATE_CONNECT_QUEUED){
+
+          msc->state = MULE_SOURCE_STATE_CONNECT_FAILED;
+
+          msc->done = true;
+                    
+        } else if (msc->fd){
+
+          LOG_DEBUG("Queueing disconnect for %s:%d", msc->ip4_str, ntohs(msc->tcp_port_no));
+
+          if (!mule_session_create_queue_out_pkt(
+                                                 ms,
+                                                 PACKET_ACTION_DISCONNECT,
+                                                 msc->ip4_no,
+                                                 msc->tcp_port_no,
+                                                 msc->fd,
+                                                 NULL,
+                                                 0
+                                                )
+          ){
+
+            LOG_ERROR("Failed to queue packet.");
+
+            break;
+
+          }
+
+          msc->state = MULE_SOURCE_STATE_DISCONNECT_QUEUED;
+
+        }
 
       }
 
@@ -388,6 +464,8 @@ mule_session_remove_disconnected_sources(
                                         )
 {
   bool result = false;
+  uint8_t action = 0;
+  void* arg = NULL;
   MULE_SOURCE* msc = NULL;
   LIST* to_rem_lst = NULL;
   bool remove = false;
@@ -404,11 +482,13 @@ mule_session_remove_disconnected_sources(
 
         if (msc->state == MULE_SOURCE_STATE_DISCONNECTED){
 
-          LOG_ERROR("Removing disconnected source %s", msc->ip4_str);
+          LOG_DEBUG("Removing disconnected source %s:%d", msc->ip4_str, ntohs(msc->tcp_port_no));
 
           remove = true;
 
         } else if (msc->state == MULE_SOURCE_STATE_CONNECT_FAILED){
+
+          LOG_DEBUG("Removing source failed to connect %s", msc->ip4_str);
 
           remove = true;
 
@@ -424,6 +504,26 @@ mule_session_remove_disconnected_sources(
 
       if (list_remove_entry_by_data(&ms->sources, (void*)msc, false)){
 
+          mule_source_dequeue_action(msc, &action, &arg);
+
+          if (msc->last_action == MULE_SOURCE_ACTION_FW_CHECK || action == MULE_SOURCE_ACTION_FW_CHECK){
+
+            if (ms->kad_session && ms->kcbs.kad_fw_dec_checks_running){
+
+                ms->kcbs.kad_fw_dec_checks_running(ms->kad_session);
+
+            }
+
+          } else if (msc->last_action == MULE_SOURCE_ACTION_UDP_FW_CHECK || action == MULE_SOURCE_ACTION_UDP_FW_CHECK){
+
+            if (ms->kad_session && ms->kcbs.kad_fw_dec_checks_running_udp){
+
+              ms->kcbs.kad_fw_dec_checks_running_udp(ms->kad_session);
+
+            }
+
+          }
+
         mule_source_destroy(msc);
 
       }
@@ -433,6 +533,8 @@ mule_session_remove_disconnected_sources(
     result = true;
 
   } while (false);
+
+  if (to_rem_lst) list_destroy(to_rem_lst, false);
 
   return result;
 }
@@ -508,7 +610,7 @@ mule_session_do_source_scheduled_action(
 
   } while (false);
 
-  if (*end_flag_out) *end_flag_out = no_more_actions;
+  if (end_flag_out) *end_flag_out = no_more_actions;
 
   return result;
 }
@@ -531,15 +633,34 @@ mule_session_manage_sources(
 
     if (!ms) break;
 
+    LOG_DEBUG("Active sources list:\n");
+
     LIST_EACH_ENTRY_WITH_DATA_BEGIN(ms->sources, e, msc);
 
-      LOG_DEBUG("Source state for %s:%d - %d", msc->ip4_str, ntohs(msc->tcp_port_no), msc->state);
+      LOG_DEBUG(
+                "Source state for %s:%d (%s) - %s, done = %s, last_action_time = %.8x", 
+                msc->ip4_str, 
+                ntohs(msc->tcp_port_no), 
+                (msc->direction == MULE_SOURCE_DIRECTION_IN?"IN":"OUT"), 
+                muledbg_source_state_by_name(msc->state),
+                (msc->done == true?"true":"false"),
+                msc->last_action_time
+               );
+
+      action_queued = false;
 
       switch (msc->state){
 
         case MULE_SOURCE_STATE_NEW:
 
           if (msc->direction == MULE_SOURCE_DIRECTION_OUT){
+
+            LOG_DEBUG(
+                      "Queueing connect for %s:%d (%s)", 
+                       msc->ip4_str, 
+                       ntohs(msc->tcp_port_no), 
+                       (msc->direction == MULE_SOURCE_DIRECTION_IN?"IN":"OUT") 
+                     );
 
             if (!mule_session_create_queue_out_pkt(ms, PACKET_ACTION_CONNECT, msc->ip4_no, msc->tcp_port_no, msc->fd, NULL, 0)){
 
@@ -548,6 +669,8 @@ mule_session_manage_sources(
               break;
 
             }
+
+            msc->state = MULE_SOURCE_STATE_CONNECT_QUEUED;
 
             action_queued = true;
 
@@ -559,7 +682,7 @@ mule_session_manage_sources(
 
           if (msc->direction == MULE_SOURCE_DIRECTION_OUT){
 
-            if (mulehlp_queue_hello_pkt(ms, msc, false)) {
+            if (mulehlp_queue_hello_pkt(ms, msc, false)){
 
               msc->state = MULE_SOURCE_STATE_HELLO_SENT;
 
@@ -583,9 +706,17 @@ mule_session_manage_sources(
 
               msc->wait_io_completion = true;
 
+              action_queued = true;
+
             }
 
-            action_queued = true;
+          } else if (msc->direction == MULE_SOURCE_DIRECTION_OUT){
+
+            msc->state = MULE_SOURCE_STATE_HANDSHAKE_COMPLETED;
+
+            msc->wait_io_completion = false;
+
+            action_queued = false;
 
           }
 
@@ -597,21 +728,15 @@ mule_session_manage_sources(
 
             msc->wait_io_completion = true;
 
-            action_queued = true;
+            action_queued = false;
 
           } else {
 
             all_actions_done = false;
 
-            if (msc->last_action == MULE_SOURCE_ACTION_FW_CHECK){
+            current_action_done = false;
 
-               if (ms->kad_session && ms->kcbs.kad_fw_dec_checks_running) ms->kcbs.kad_fw_dec_checks_running(ms->kad_session);
-
-            } else if (msc->last_action == MULE_SOURCE_ACTION_UDP_FW_CHECK){
-
-               if (ms->kad_session && ms->kcbs.kad_fw_dec_checks_running_udp) ms->kcbs.kad_fw_dec_checks_running_udp(ms->kad_session);
-
-            }
+            wait_io_completion = false;
 
             mule_session_do_source_scheduled_action(
                                                     ms, 
@@ -620,7 +745,7 @@ mule_session_manage_sources(
                                                     &wait_io_completion, 
                                                     &timeout_before_done, 
                                                     &all_actions_done
-                                                    );
+                                                   );
 
             if (all_actions_done){
 
@@ -686,6 +811,8 @@ mule_session_manage_sources(
 
         case MULE_SOURCE_STATE_ACTION_DONE:
 
+          LOG_DEBUG("Queueing disconnect for %s:%d", msc->ip4_str, ntohs(msc->tcp_port_no));
+
           if (!mule_session_create_queue_out_pkt(
                                                  ms,
                                                  PACKET_ACTION_DISCONNECT,
@@ -702,6 +829,8 @@ mule_session_manage_sources(
             break;
 
           }
+
+          msc->state = MULE_SOURCE_STATE_DISCONNECT_QUEUED;
 
           action_queued = true;
 
@@ -826,13 +955,19 @@ mule_session_deq_and_handle_out_qpkt(
 
       case PACKET_ACTION_SEND_DATA:
 
+        LOG_DEBUG("Sending packet, handle = %.8x, length = %.8x.", msc->fd, qpkt->pkt_len);
+
         ms->ncbs.send(msc->fd, qpkt->pkt, qpkt->pkt_len); 
 
       break;
 
       case PACKET_ACTION_DISCONNECT:
 
+        LOG_DEBUG("Disconnecting %s:%d, handle = %.8x", msc->ip4_str, ntohs(msc->tcp_port_no), msc->fd);
+
         ms->ncbs.disconnect(msc->fd);
+
+        mule_session_peer_disconnected(ms, msc->fd);
 
       break;
 
@@ -841,6 +976,8 @@ mule_session_deq_and_handle_out_qpkt(
     result = true;
 
   } while (false);
+
+  if (qpkt) muleqpkt_destroy(qpkt, true);
 
   return result;
 }
@@ -885,7 +1022,7 @@ mule_session_update(
 
       mule_session_deq_and_handle_in_qpkt(ms);
 
-      ms->timers.handle_in_packets = now + SEC2MS(5);
+      ms->timers.handle_in_packets = now + 500;
 
     }
 
@@ -893,7 +1030,7 @@ mule_session_update(
 
       mule_session_deq_and_handle_out_qpkt(ms);
 
-      ms->timers.handle_out_packets = now + SEC2MS(5);
+      ms->timers.handle_out_packets = now + 500;
 
     }
 
@@ -903,7 +1040,6 @@ mule_session_update(
 
   return result;
 }
-
 
 bool
 mule_session_new_connection(
@@ -915,19 +1051,31 @@ mule_session_new_connection(
 {
   bool result = false;
   MULE_SOURCE* msc = NULL;
+  bool source_not_found = false;
 
   do {
+       
+    mule_session_global_source_by_ip_and_direction(ms, ip4_no, MULE_SOURCE_DIRECTION_IN, &msc);
 
-    // [IMPLEMENT] probably need to check if there already source with given
-    // ip:port combination.
+    // This situation shouldn't happen, sources for incomming
+    // connections always should be added before actual
+    // incomming connection hapenning, and if source will be created
+    // here port will be set to incomming connection port
+    // instead of source listen port which is wrong.
     
-    mule_source_create(1, NULL, ip4_no, port_no, 0, 0, &msc);
-
     if (!msc){
 
-      LOG_ERROR("Failed to create source.");
+      source_not_found = true;
+    
+      mule_source_create(1, NULL, ip4_no, port_no, 0, 0, &msc);
 
-      break;
+      if (!msc){
+
+        LOG_ERROR("Failed to create source.");
+
+        break;
+
+      }
 
     }
 
@@ -937,13 +1085,17 @@ mule_session_new_connection(
 
     msc->done = true;
 
-    mule_source_set_direction(msc, MULE_SOURCE_DIRECTION_IN);
+    if (source_not_found){
 
-    if (!mule_session_add_global_source(ms, msc)){
+      mule_source_set_direction(msc, MULE_SOURCE_DIRECTION_IN);
 
-      LOG_ERROR("Failed to add source to global sources list.");
+      if (!mule_session_add_global_source(ms, msc)){
 
-      break;
+        LOG_ERROR("Failed to add source to global sources list.");
+
+        break;
+
+      }
 
     }
 
@@ -951,7 +1103,7 @@ mule_session_new_connection(
 
   } while (false);
 
-  if (!result && msc) mule_source_destroy(msc);
+  if (!result && source_not_found && msc) mule_source_destroy(msc);
 
   return result;
 }
@@ -1013,6 +1165,8 @@ mule_session_peer_disconnected(
 
     }
 
+    msc->last_action_time = 0;
+
     msc->state = MULE_SOURCE_STATE_DISCONNECTED;
 
     msc->done = true;
@@ -1030,12 +1184,14 @@ bool
 mule_session_data_received(
                            MULE_SESSION* ms,
                            void* fd,
-                           uint8_t* pkt,
-                           uint32_t pkt_len
+                           uint8_t* data,
+                           uint32_t data_len
                           )
 {
   bool result = false;
   MULE_SOURCE* msc = NULL;
+  uint8_t* pkt = NULL;
+  uint32_t pkt_len = 0;
 
   do {
 
@@ -1048,6 +1204,20 @@ mule_session_data_received(
       break;
 
     }
+
+    pkt_len = data_len;
+
+    pkt = (uint8_t*)mem_alloc(pkt_len);
+
+    if (!pkt){
+
+      LOG_ERROR("Failed to allocate memory for packet.");
+
+      break;
+
+    }
+
+    memcpy(pkt, data, data_len);
 
     if (!mule_session_create_queue_in_pkt(
                                           ms,
@@ -1124,6 +1294,60 @@ mule_session_add_source_for_udp_fw_check(
   } while (false);
 
   if (!result && msc) mule_source_destroy(msc);
+
+  return result;
+}
+
+bool
+mule_session_add_source_for_tcp_fw_check(
+                                         MULE_SESSION* ms,
+                                         UINT128* id,
+                                         uint32_t ip4_no,
+                                         uint16_t tcp_port_no,
+                                         uint16_t udp_port_no
+                                        )
+{
+  bool result = false;
+  MULE_SOURCE* msc = NULL;
+
+  do {
+
+    if (!ms) break;
+
+    if (!mule_source_create(
+                            1,
+                            id,
+                            ip4_no,
+                            tcp_port_no,
+                            udp_port_no,
+                            0,
+                            &msc
+                           )
+    ){
+
+      LOG_ERROR("Failed to create mule source.");
+
+      break;
+
+    }
+
+    mule_source_queue_action(msc, MULE_SOURCE_ACTION_FW_CHECK, NULL);
+
+    mule_source_set_direction(msc, MULE_SOURCE_DIRECTION_IN);
+
+    msc->done = true;
+
+    if (!mule_session_add_global_source(ms, msc)){
+
+      LOG_ERROR("Failed to add source to global sources list.");
+
+      break;
+
+    }
+
+    result = true;
+
+  } while (false);
 
   return result;
 }

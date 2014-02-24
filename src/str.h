@@ -6,7 +6,8 @@ str_unicode_to_utf8(
                     wchar_t* uc_str,
                     size_t uc_str_len,
                     char* res_buf,
-                    size_t res_buf_len
+                    size_t res_buf_len,
+                    uint32_t* emited_len_out
                    );
 
 bool
@@ -14,7 +15,8 @@ str_utf8_to_unicode(
                     char* in_str,
                     size_t in_str_len,
                     wchar_t* out_buf,
-                    size_t out_buf_len
+                    size_t out_buf_len,
+                    uint32_t* read_len_out
                    );
 
 uint32_t

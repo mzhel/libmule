@@ -370,7 +370,7 @@ mulepkt_create_hello(
 
     // Tags
     
-    if (tag_list_emit(tl, p, rem_len, true, &p, &rem_len)){
+    if (!tag_list_emit(tl, p, rem_len, true, &p, &rem_len)){
 
       LOG_ERROR("Failed to emit tag list.");
 
@@ -445,7 +445,7 @@ mulepkt_create_udp_fw_check_req_pkt(
 
   do {
 
-    if (!ms || !raw_pkt || !raw_pkt_len) break;
+    if (!ms || !raw_pkt_out || !raw_pkt_len_out) break;
 
     rem_len  = pkt_data_len = sizeof(uint16_t) + // Internal kad port
                               sizeof(uint16_t) + // External kad port
@@ -500,6 +500,8 @@ mulepkt_create_udp_fw_check_req_pkt(
     result = true;
 
   } while (false);
+
+  if (pkt_data) mem_free(pkt_data);
 
   return result;
 }

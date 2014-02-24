@@ -122,6 +122,35 @@ mulehlp_destroy_out_pkt_queue(
 }
 
 bool
+mulehlp_destroy_sources_list(
+                             MULE_SESSION* ms
+                            )
+{
+  bool result = false;
+  MULE_SOURCE* msc = NULL;
+
+  do {
+
+    if (!ms) break;
+
+    LIST_EACH_ENTRY_WITH_DATA_BEGIN(ms->sources, e, msc);
+
+      if (msc->fd) ms->ncbs.disconnect(msc->fd);
+
+      mule_source_destroy(msc);
+
+    LIST_EACH_ENTRY_WITH_DATA_END(e);
+
+    list_destroy(ms->sources, false);
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
 mulehlp_queue_hello_pkt(
                         MULE_SESSION* ms,
                         MULE_SOURCE* msc,
@@ -201,7 +230,7 @@ mulehlp_queue_udp_fw_chk_pkt(
 
     mulehlp_calc_udp_verify_key(ms, msc->ip4_no, &udp_verify_key);
 
-    LOG_DEBUG("int_port %d, ext_port %d, verify_key %d", kss.udp_port, kss.ext_udp_port, udp_verify_key);
+    LOG_DEBUG("int_port %d, ext_port %d, verify_key %.8x", kss.udp_port, kss.ext_udp_port, udp_verify_key);
 
     if (!mulepkt_create_udp_fw_check_req_pkt(ms, kss.udp_port, kss.ext_udp_port, udp_verify_key, &pkt, &pkt_len)){
 
@@ -211,9 +240,15 @@ mulehlp_queue_udp_fw_chk_pkt(
 
     }
     
-    QUEUE_OUT_PKT(ms, pkt);
-
-    result = true;
+    result = mule_session_create_queue_out_pkt(
+                                               ms,
+                                               PACKET_ACTION_SEND_DATA,
+                                               msc->ip4_no,
+                                               msc->tcp_port_no,
+                                               msc->fd,
+                                               pkt,
+                                               pkt_len
+                                              );
 
   } while (false);
 
