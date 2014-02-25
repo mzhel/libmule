@@ -62,6 +62,35 @@ typedef struct _kad_callbacks {
   KAD_FW_DEC_CHECKS_RUNNING_UDP kad_fw_dec_checks_running_udp;
 } KAD_CALLBACKS;
 
+#ifndef CIPHER_CALLBACKS_DEFINED
+#define CIPHER_CALLBACKS_DEFINED
+
+// arc4_context is commented out here
+// because when this header is included in application
+// using this library polarssl headers
+// should be included before this header.
+// Measure is temporary, need to figure out something better.
+
+/*
+typedef struct {
+  uint8_t data[512];
+} arc4_context;
+*/
+
+typedef void (*MD4)(const unsigned char *input, size_t ilen, unsigned char output[16]);
+typedef void (*MD5)(const unsigned char *input, size_t ilen, unsigned char output[16]);
+typedef void (*ARC4_SETUP)(arc4_context *ctx, const unsigned char *key, unsigned int keylen);
+typedef int (*ARC4_CRYPT)(arc4_context *ctx, size_t length, const unsigned char *input, unsigned char *output);
+
+typedef struct _cipher_callbacks {
+  MD4 md4;
+  MD5 md5;
+  ARC4_SETUP arc4_setup;
+  ARC4_CRYPT arc4_crypt;
+} CIPHER_CALLBACKS;
+
+#endif
+
 bool
 mule_session_init(
                   uint16_t tcp_port,
@@ -86,6 +115,12 @@ mule_session_set_network_callbacks(
                                    void* net_handle,
                                    MULE_NETWORK_CALLBACKS* ncbs
                                   );
+
+bool
+mule_session_set_cipher_callbacks(
+                                  MULE_SESSION* ms,
+                                  CIPHER_CALLBACKS* ccbs
+                                 );
 
 bool
 mule_session_new_connection(

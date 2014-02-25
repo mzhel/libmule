@@ -15,9 +15,9 @@
 #include <ticks.h>
 #include <pktasm.h>
 #include <mulesrc.h>
+#include <muleses.h>
 #include <mem.h>
 #include <log.h>
-#include <polarssl/md5.h>
 
 bool
 mule_source_create(
@@ -379,7 +379,8 @@ mule_source_get_part_to_download(
 */
 bool
 mule_source_set_cipher(
-                       MULE_SOURCE* msc
+                       MULE_SOURCE* msc,
+                       CIPHER_CALLBACKS* ccbs
                       )
 {
   bool result = false;
@@ -391,7 +392,7 @@ mule_source_set_cipher(
 
   do {
 
-    if (!msc) break;
+    if (!msc || !ccbs) break;
 
     uint128_emit_be(&msc->id, hash_byte_str, sizeof(hash_byte_str));
 
@@ -407,7 +408,7 @@ mule_source_set_cipher(
     
     key_data[16] = MAGIC_VALUE_REQUESTER;
 
-    md5(key_data, sizeof(key_data), md5_dgst);
+    ccbs->md5(key_data, sizeof(key_data), md5_dgst);
 
     memcpy(msc->send_buf_key, key_data, sizeof(msc->send_buf_key));
 
@@ -415,7 +416,7 @@ mule_source_set_cipher(
     
     key_data[16] = MAGIC_VALUE_SERVER;
 
-    md5(key_data, sizeof(key_data), md5_dgst);
+    ccbs->md5(key_data, sizeof(key_data), md5_dgst);
 
     memcpy(msc->recv_buf_key, key_data, sizeof(msc->recv_buf_key));
 

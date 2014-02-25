@@ -4,9 +4,8 @@ LIBKADDIR=.
 [CLangCompiler]
 SOURCES=@sources@
 OBJDIR=./obj/
-INCLUDE=./src;./extrn/polarssl/include;./extrn/common-code
+INCLUDE=./src;./extrn/common-code
 KEYS=-fshort-wchar -fPIC -fpack-struct=1
-DEFINE=POLARSSL_HAVEGE_C POLARSSL_MD4_C
 Debug:
 KEYS=-ggdb
 Verbose:

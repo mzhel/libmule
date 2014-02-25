@@ -67,6 +67,22 @@ typedef struct _kad_callbacks {
   KAD_FW_DEC_CHECKS_RUNNING_UDP kad_fw_dec_checks_running_udp;
 } KAD_CALLBACKS;
 
+typedef struct {
+  uint8_t data[512];
+} arc4_context;
+
+typedef void (*MD4)(const unsigned char *input, size_t ilen, unsigned char output[16]);
+typedef void (*MD5)(const unsigned char *input, size_t ilen, unsigned char output[16]);
+typedef void (*ARC4_SETUP)(arc4_context *ctx, const unsigned char *key, unsigned int keylen);
+typedef int (*ARC4_CRYPT)(arc4_context *ctx, size_t length, const unsigned char *input, unsigned char *output);
+
+typedef struct _cipher_callbacks {
+  MD4 md4;
+  MD5 md5;
+  ARC4_SETUP arc4_setup;
+  ARC4_CRYPT arc4_crypt;
+} CIPHER_CALLBACKS;
+
 typedef struct _mule_session {
   uint16_t tcp_port;
   char nick[MAX_NICK_LEN + 1];
@@ -78,6 +94,7 @@ typedef struct _mule_session {
   KAD_CALLBACKS kcbs;
   void* net_handle;
   MULE_NETWORK_CALLBACKS ncbs;
+  CIPHER_CALLBACKS ccbs;
   MULE_SESSION_TIMERS timers;
 } MULE_SESSION;
 

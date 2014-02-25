@@ -45,7 +45,7 @@ mule_session_init(
 
     strcpy(ms->nick, "muleuser");
 
-    random_init();
+    random_init(ticks_now_ms());
 
     ms->tcp_port = tcp_port;
 
@@ -139,6 +139,27 @@ mule_session_set_network_callbacks(
     ms->net_handle = net_handle;
 
     memcpy(&ms->ncbs, ncbs, sizeof(MULE_NETWORK_CALLBACKS));
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_session_set_cipher_callbacks(
+                                  MULE_SESSION* ms,
+                                  CIPHER_CALLBACKS* ccbs
+                                 )
+{
+  bool result = false;
+
+  do {
+
+    if (!ms || !ccbs) break;
+
+    memcpy(&ms->ncbs, ccbs, sizeof(CIPHER_CALLBACKS));
 
     result = true;
 

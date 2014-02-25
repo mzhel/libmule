@@ -2,7 +2,7 @@
 #define _RANDOM_H_
 
 void
-random_init();
+random_init(uint32_t seed);
 
 uint32_t
 random_uint32();
