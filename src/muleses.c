@@ -159,7 +159,7 @@ mule_session_set_cipher_callbacks(
 
     if (!ms || !ccbs) break;
 
-    memcpy(&ms->ncbs, ccbs, sizeof(CIPHER_CALLBACKS));
+    memcpy(&ms->ccbs, ccbs, sizeof(CIPHER_CALLBACKS));
 
     result = true;
 
