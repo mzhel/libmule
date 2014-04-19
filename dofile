@@ -23,8 +23,8 @@ KEYS= -shared
 TARGETNAME=$NAME$.a
 TARGETDIR=./bin/
 [Deployer]
-./bin/libmule.a=../kad/lib/$NAME$.a
-./src/libmule.h=../kad/src/libmule/$NAME$.h
+./bin/libmule.a=../kad/lib/$NAME$.a,../wxkad/lib/$NAME$.a
+./src/libmule.h=../kad/src/libmule/$NAME$.h,../wxkad/src/libmule/$NAME$.h
 [Cleaner]
 DIRS=./;./obj/;./bin/
 EXTS=*.o;*.dat;*.a
