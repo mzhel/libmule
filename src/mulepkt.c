@@ -9,6 +9,7 @@
 #include <queue.h>
 #include <tag.h>
 #include <taglst.h>
+#include <mulefile.h>
 #include <mulesrc.h>
 #include <muleses.h>
 #include <muleqpkt.h>
@@ -502,6 +503,422 @@ mulepkt_create_udp_fw_check_req_pkt(
   } while (false);
 
   if (pkt_data) mem_free(pkt_data);
+
+  return result;
+}
+
+bool
+mulepkt_create_mp_file_request(
+                               MULE_SOURCE* msc,
+                               MULE_FILE* mf,
+                               void** raw_pkt_out,
+                               uint32_t* raw_pkt_len_out,
+                               uint32_t* sent_flags_out
+                              )
+{
+  bool result = false;
+  uint8_t* pkt_data = NULL;
+  uint32_t pkt_data_len = 0;
+  void* raw_pkt = NULL;
+  uint8_t* p = NULL;
+  uint32_t rem_len = 0;
+  uint32_t bytes_emited = 0;
+  uint32_t sent_flags = 0;
+
+  do {
+
+    pkt_data_len = sizeof(UINT128) + // File hash
+                   (msc->info.misc_opts_2.ext_multi_packet?sizeof(uint64_t):0) + // File size
+                   sizeof(uint8_t); // place for OP_REQUESTFILENAME
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 0){
+
+      pkt_data_len += mule_file_calc_part_info_size(mf);
+
+    }
+
+    // Complete sources count.
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 1){
+
+      pkt_data_len += sizeof(uint16_t);
+
+    }
+
+    if (mf->part_count > 1){
+
+      pkt_data_len += sizeof(uint8_t); // place for OP_SETREQFILEID
+
+    }
+
+    // [TODO] Check if source request is allowed.
+
+    if (msc->info.misc_opts_1.AICH_ver & 1){
+
+      pkt_data_len += sizeof(uint8_t); // place for OP_AICHFILEHASHREQ
+
+    }
+
+    rem_len = pkt_data_len;
+
+    p = pkt_data = (uint8_t*)mem_alloc(pkt_data_len);
+
+    if (!pkt_data){
+
+      LOG_ERROR("Failed to allocate memory for packet.");
+
+      break;
+
+    }
+
+    // Emit data
+    
+    // File hash
+    
+    uint128_emit_be(&mf->id, p, rem_len);
+
+    p += sizeof(UINT128);
+
+    rem_len -= sizeof(UINT128);
+
+    // File size
+
+    if (msc->info.misc_opts_2.ext_multi_packet){
+
+      *((uint64_t*)p) = mf->length;
+
+      p += sizeof(uint64_t);
+
+      rem_len -= sizeof(uint64_t);
+    }
+
+    // Opcode
+      
+    *p++ = OP_REQUESTFILENAME;
+
+    rem_len--;
+
+    // File parts info
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 0){
+
+      if (!mule_file_emit_parts_info(mf, p, rem_len, &bytes_emited)){
+
+        LOG_ERROR("Failed to emit parts info.");
+
+        break;
+
+      }
+
+      p += bytes_emited;
+
+      rem_len -= bytes_emited;
+
+    }
+
+    sent_flags |= MULE_SOURCE_FLAG_FILE_NAME;
+
+    // Complete sources count.
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 1){
+
+      *((uint16_t*)p) = mf->complete_sources_count;
+
+      p += sizeof(uint16_t);
+
+      rem_len -= sizeof(uint16_t);
+
+    }
+
+    // OP_SETREQFILEID
+
+    if (mf->part_count > 1){
+
+      *p++ = OP_SETREQFILEID;
+
+      rem_len--;
+
+      sent_flags |= MULE_SOURCE_FLAG_FILE_STATUS;
+
+    }
+
+    // [IMPLEMENT] source exchange
+      
+    if (msc->info.misc_opts_1.AICH_ver & 1){
+
+      *p++ = OP_AICHFILEHASHREQ;
+
+      sent_flags |= MULE_SOURCE_FLAG_AICH_HASH;
+
+    }
+
+    if (!mulepkt_create_emit(
+                        OP_EMULEPROT, 
+                        msc->info.misc_opts_2.ext_multi_packet?OP_MULTIPACKET_EXT:OP_MULTIPACKET,
+                        pkt_data, 
+                        pkt_data_len,
+                        raw_pkt_out,
+                        raw_pkt_len_out
+                        )
+    ) {
+
+      LOG_ERROR("Failed to emit file request multi packet.");
+
+      break;
+
+    }
+
+    *sent_flags_out = sent_flags; 
+
+    result = true;
+
+  } while (false);
+
+  if (pkt_data) mem_free(pkt_data);
+
+  return result;
+}
+
+bool
+mulepkt_create_file_name_request(
+                                 MULE_SOURCE* msc,
+                                 MULE_FILE* mf,
+                                 void** raw_pkt_out,
+                                 uint32_t* raw_pkt_len_out
+                                )
+{
+  bool result = false;
+  uint32_t rem_len = 0;
+  uint32_t bytes_emited = 0;
+  uint8_t* pkt_data = NULL;
+  uint32_t pkt_data_len = 0;
+  uint8_t* p = NULL;
+
+  do {
+
+    if (!msc || !mf) break;
+
+    pkt_data_len = sizeof(UINT128); // File hash
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 0){
+      
+      pkt_data_len += mule_file_calc_part_info_size(mf); // File parts info
+
+    }
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 1){
+
+      pkt_data_len += sizeof(uint16_t); // Complete sources count.
+    }
+
+    rem_len = pkt_data_len;
+
+    p = pkt_data = (uint8_t*)mem_alloc(pkt_data_len);
+
+    if (!pkt_data){
+
+      LOG_ERROR("Failed to allocate memory for packet.");
+
+      break;
+
+    }
+
+    // Emit data
+     
+    // File hash.
+    
+    uint128_emit_be(&mf->id, p, rem_len);
+
+    p += sizeof(UINT128);
+
+    rem_len -= sizeof(UINT128);
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 0){
+
+      // File parts info.
+
+      if (!mule_file_emit_parts_info(mf, p, rem_len, &bytes_emited)){
+
+        LOG_ERROR("Faield to emit file parts info.");
+
+        break;
+
+      }
+
+      p += bytes_emited;
+
+      rem_len -= bytes_emited;
+      
+
+    }
+
+    if (msc->info.misc_opts_1.extended_requests_ver > 1){
+
+      // Complete sources count.
+
+      *(uint16_t*)p = mf->complete_sources_count;
+
+      p += sizeof(uint16_t);
+
+      rem_len -= sizeof(uint16_t);
+
+    }
+
+    if (!mulepkt_create_emit(
+                             OP_EDONKEYPROT, 
+                             OP_REQUESTFILENAME,
+                             pkt_data, 
+                             pkt_data_len,
+                             raw_pkt_out,
+                             raw_pkt_len_out
+                            )
+    ) {
+
+      LOG_ERROR("Failed to emit file name request packet.");
+        
+      break;
+
+    }
+
+    result = true;
+
+  } while (false);
+
+  if (pkt_data) mem_free(pkt_data);
+
+  return result;
+}
+
+bool
+mulepkt_create_file_hash_set_request(
+                                     MULE_SOURCE* msc,
+                                     MULE_FILE* mf,
+                                     void** raw_pkt_out,
+                                     uint32_t* raw_pkt_len_out
+                                    )
+{
+  bool result = false;
+  uint8_t* pkt_data = NULL;
+  uint32_t pkt_data_len = 0;
+  uint8_t* p = NULL;
+  uint32_t rem_len = 0;
+  uint32_t bytes_emited = 0;
+  
+  do {
+
+    if (!msc || !mf) break;
+
+    pkt_data_len = sizeof(UINT128); // File hash.
+
+    rem_len = pkt_data_len;
+
+    p = pkt_data = (uint8_t*)mem_alloc(pkt_data_len);
+
+    if (!pkt_data){
+
+      LOG_ERROR("Failed to allcate memory for packet data.");
+
+      break;
+
+    }
+
+    // Emit data
+    
+    // File hash.
+      
+    uint128_emit_be(&mf->id, p, rem_len);
+
+    p += sizeof(UINT128);
+
+    rem_len -= sizeof(UINT128);
+
+    if (!mulepkt_create_emit(
+                             OP_EDONKEYPROT, 
+                             OP_SETREQFILEID,
+                             pkt_data, 
+                             pkt_data_len,
+                             raw_pkt_out,
+                             raw_pkt_len_out
+                            )
+    ) {
+
+      LOG_ERROR("Failed to emit file id set request packet.");
+        
+      break;
+
+    }
+
+    result = true;
+
+  } while (false);
+
+  if (pkt_data) mem_free(pkt_data);
+
+  return result;
+}
+
+bool
+mule_pkt_create_AICH_request(
+                             MULE_SOURCE* msc,
+                             MULE_FILE* mf,
+                             void** raw_pkt_out,
+                             uint32_t* raw_pkt_len_out
+                            )
+{
+  bool result = false;
+  uint8_t* pkt_data = NULL;
+  uint32_t pkt_data_len = 0;
+  uint8_t* p = NULL;
+  uint32_t rem_len = 0;
+  uint32_t bytes_emited = 0;
+
+  do {
+
+    if (!msc || !mf) break;
+
+    pkt_data_len = sizeof(UINT128); // File hash.
+
+    rem_len = pkt_data_len;
+
+    p = pkt_data = (uint8_t*)mem_alloc(pkt_data_len);
+
+    if (!pkt_data){
+
+      LOG_ERROR("Failed to allcate memory for packet data.");
+
+      break;
+
+    }
+
+    // Emit data
+    
+    // File hash.
+      
+    uint128_emit_be(&mf->id, p, rem_len);
+
+    p += sizeof(UINT128);
+
+    rem_len -= sizeof(UINT128);
+
+    if (!mulepkt_create_emit(
+                             OP_EDONKEYPROT, 
+                             OP_AICHFILEHASHREQ,
+                             pkt_data, 
+                             pkt_data_len,
+                             raw_pkt_out,
+                             raw_pkt_len_out
+                            )
+    ) {
+
+      LOG_ERROR("Failed to emit file AICH hash request packet.");
+        
+      break;
+
+    }
+
+    result = true;
+
+  } while (false);
 
   return result;
 }

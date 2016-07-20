@@ -4,6 +4,7 @@
  $LIBKADDIR$/src/mulesrc.c \
  $LIBKADDIR$/src/mulehlp.c \
  $LIBKADDIR$/src/muleproto.c \
+ $LIBKADDIR$/src/mulefile.c \
  $LIBKADDIR$/src/packet.c \
  $LIBKADDIR$/src/pktasm.c \
  $LIBKADDIR$/src/tag.c \

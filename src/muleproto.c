@@ -6,6 +6,7 @@
 #include <list.h>
 #include <queue.h>
 #include <mule.h>
+#include <mulefile.h>
 #include <mulesrc.h>
 #include <muleses.h>
 #include <muleqpkt.h>
@@ -343,6 +344,46 @@ mule_proto_udp_fw_check_req(
 }
 
 bool
+mule_proto_file_name_answer(
+                            MULE_SOURCE* msc,
+                            uint8_t buffer,
+                            uint32_t len,
+                            uint32_t* parsed_len_out
+                           )
+{
+  bool result = false;
+
+  do {
+
+    if (!msc || !buffer) break;
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_proto_file_status(
+                       MULE_SOURCE* msc,
+                       uint8_t buffer,
+                       uint32_t len,
+                       uint32_t* parsed_len_out
+                      )
+{
+  bool result = false;
+
+  do {
+
+  result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
 mule_proto_handle_donkey_packet(
                                 MULE_SESSION* ms,
                                 MULE_SOURCE* msc,
@@ -395,6 +436,12 @@ mule_proto_handle_donkey_packet(
         msc->state = MULE_SOURCE_STATE_HELLO_RECEIVED;
 
         msc->done = true;
+
+      break;
+
+      case OP_REQFILENAMEANSWER:
+
+        
 
       break;
 

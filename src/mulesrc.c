@@ -14,6 +14,7 @@
 #include <random.h>
 #include <ticks.h>
 #include <pktasm.h>
+#include <mulefile.h>
 #include <mulesrc.h>
 #include <muleses.h>
 #include <mem.h>
@@ -242,7 +243,7 @@ mule_source_copy(
   return result;
 }
 
-/*
+
 bool
 mule_source_new_download(
                          MULE_SOURCE* msc,
@@ -270,7 +271,7 @@ mule_source_new_download(
     // If whole file length is lesser than size of one part
     // we assume there is at least one part available on the source.
     
-    if (mf->size < mf->part_size){
+    if (mf->length < mf->part_size){
 
       msc->dl_info.parts_status = (uint8_t*)mem_alloc(sizeof(uint8_t));
 
@@ -294,7 +295,7 @@ mule_source_new_download(
 
   return result;
 }
-
+/*
 bool
 mule_source_set_up_down_parts_info(
                                    MULE_SOURCE* msc,

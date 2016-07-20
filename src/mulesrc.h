@@ -66,8 +66,6 @@
 #define MULE_SOURCE_ACTIONS_LOCK(msc)
 #define MULE_SOURCE_ACTIONS_UNLOCK(msc)
 
-typedef struct _kad_file MULE_FILE;
-
 typedef struct _sent_part {
   uint8_t state;
   uint8_t* data;
@@ -186,6 +184,12 @@ mule_source_copy(
                  MULE_SOURCE* msc_src,
                  MULE_SOURCE** msc_dst_out
                 );
+
+bool
+mule_source_new_download(
+                         MULE_SOURCE* msc,
+                         MULE_FILE* mf
+                        );
 
 bool
 mule_source_queue_action(

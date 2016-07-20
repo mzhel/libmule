@@ -34,4 +34,39 @@ mulepkt_create_udp_fw_check_req_pkt(
                                     uint32_t* raw_pkt_len_out
                                    );
 
+bool
+mulepkt_create_mp_file_request(
+                               MULE_SOURCE* msc,
+                               MULE_FILE* mf,
+                               void** raw_pkt_out,
+                               uint32_t* raw_pkt_len_out,
+                               uint32_t* sent_flags_out
+                              );
+
+bool
+mulepkt_create_file_name_request(
+                                 MULE_SOURCE* msc,
+                                 MULE_FILE* mf,
+                                 void** raw_pkt_out,
+                                 uint32_t* raw_pkt_len_out
+                                );
+
+bool
+mulepkt_create_file_hash_set_request(
+                                     MULE_SOURCE* msc,
+                                     MULE_FILE* mf,
+                                     void** raw_pkt_out,
+                                     uint32_t* raw_pkt_len_out
+                                    );
+
+bool
+mule_pkt_create_AICH_request(
+                             MULE_SOURCE* msc,
+                             MULE_FILE* mf,
+                             void** raw_pkt_out,
+                             uint32_t* raw_pkt_len_out
+                            );
+
+
+
 #endif // _MULEPKT_H_

@@ -53,6 +53,7 @@ typedef struct _mule_sesssion_timers {
   uint32_t manage_sources;
   uint32_t manage_inactive_sources;
   uint32_t remove_disconnected_sources;
+  uint32_t manage_public_files;
   uint32_t handle_in_packets;
   uint32_t handle_out_packets;
 } MULE_SESSION_TIMERS;
@@ -91,6 +92,7 @@ typedef struct _mule_session {
   QUEUE* queue_in_pkt;
   QUEUE* queue_out_pkt;
   void* kad_session;
+  LIST* pub_files;
   KAD_CALLBACKS kcbs;
   void* net_handle;
   MULE_NETWORK_CALLBACKS ncbs;

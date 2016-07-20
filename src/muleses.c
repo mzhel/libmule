@@ -8,6 +8,7 @@
 #include <list.h>
 #include <queue.h>
 #include <mule.h>
+#include <mulefile.h>
 #include <mulesrc.h>
 #include <muleses.h>
 #include <mulehlp.h>
@@ -89,6 +90,8 @@ mule_session_uninit(
     mulehlp_destroy_out_pkt_queue(ms);
 
     mulehlp_destroy_sources_list(ms);
+
+    mulehlp_destroy_pub_files_list(ms);
 
     mem_free(ms);
 
@@ -561,6 +564,68 @@ mule_session_remove_disconnected_sources(
 }
 
 bool
+mule_session_manage_download(
+                             MULE_SESSION* ms,
+                             MULE_SOURCE* msc,
+                             bool* wait_io_compl_out,
+                             bool* wait_answer_out
+                            )
+{
+  bool result = false;
+  MULE_SOURCE_DOWNLOAD_INFO* di = NULL;
+  bool wait_io_compl = false;
+  bool wait_answer = false;
+
+  do {
+
+    di = &msc->dl_info;
+
+    switch(di->state){
+
+      case MULE_SOURCE_DL_STATE_INFO_EXCHANGE:
+
+        if (!di->send_flags){
+
+          mulehlp_queue_file_request_pkt(ms, msc, di->file, &di->send_flags);
+
+        }
+
+        wait_io_compl = true;
+
+        if (di->send_flags == di->recv_flags){
+
+          if (di->file->part_hashes_needed){
+
+            // Request hashes for parts if parts count is more than one.
+            
+            di->state = MULE_SOURCE_DL_STATE_PARTS_HASHES_REQ;
+
+          } else {
+
+            di->state = MULE_SOURCE_DL_STATE_UPLOAD_REQUEST;
+
+          }
+
+          wait_io_compl = false;
+
+        }
+
+      break;
+
+    }
+
+    *wait_io_compl_out = wait_io_compl;
+
+    *wait_answer_out = wait_answer;
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
 mule_session_do_source_scheduled_action(
                                         MULE_SESSION* ms,
                                         MULE_SOURCE* msc,
@@ -578,6 +643,7 @@ mule_session_do_source_scheduled_action(
   uint32_t now = ticks_now_ms();
   bool action_done = false;
   bool wait_io_completion = false;
+  MULE_FILE* mf = NULL;
 
   do {
 
@@ -616,6 +682,26 @@ mule_session_do_source_scheduled_action(
         action_done = true;
 
         timeout = now + SEC2MS(10);
+
+      break;
+
+      case MULE_SOURCE_ACTION_DOWNLOAD:
+
+        mf = (MULE_FILE*)arg;
+
+        if (!mulehlp_pub_file_by_id(ms, &mf->id, NULL)){
+
+          LOG_ERROR("File with given id not found, download won't be started.");
+
+          break;
+
+        }
+
+        // Initiate download of a new file for given source.
+        
+        mule_source_new_download(msc, mf);
+
+        msc->state = MULE_SOURCE_STATE_DOWNLOADING;
 
       break;
 
@@ -814,6 +900,12 @@ mule_session_manage_sources(
 
         break;
 
+        case MULE_SOURCE_STATE_DOWNLOADING:
+
+          mule_session_manage_download(ms, msc, &wait_io_completion, &action_queued);
+
+        break;
+
         case MULE_SOURCE_STATE_TIMEOUT_BEFORE_DONE:
 
           msc->last_action_time = now;
@@ -866,6 +958,57 @@ mule_session_manage_sources(
         msc->done = false;
 
       }
+
+    LIST_EACH_ENTRY_WITH_DATA_END(e);
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_session_manage_public_files(
+                                 MULE_SESSION* ms
+                                )
+{
+  bool result = false;
+  MULE_FILE* mf = NULL;
+  MULE_SOURCE* msc = NULL;
+  MULE_SOURCE* msc_copy = NULL;
+
+  do {
+
+    LIST_EACH_ENTRY_WITH_DATA_BEGIN(ms->pub_files, e, mf);
+
+      // Enumerate each file source
+
+      LIST_EACH_ENTRY_WITH_DATA_BEGIN(mf->sources, e, msc);
+
+        if (mule_source_type_set(msc, MULE_SOURCE_FLAG_COPIED_TO_GLOBAL)){
+
+          // Source already in global sources list 
+
+        } else {
+
+          // Source not in global list, we need to put it there
+          
+          mule_source_copy(msc, &msc_copy); 
+
+          mule_source_set_direction(msc_copy, MULE_SOURCE_DIRECTION_OUT);
+
+          mule_source_queue_action(msc_copy, MULE_SOURCE_ACTION_DOWNLOAD, (void*)mf);
+
+          mule_session_add_global_source(ms, msc_copy); 
+
+          mule_source_add_type(msc, MULE_SOURCE_FLAG_COPIED_TO_GLOBAL);
+
+        }
+
+      LIST_EACH_ENTRY_WITH_DATA_END(e);
+
+     
 
     LIST_EACH_ENTRY_WITH_DATA_END(e);
 
@@ -1023,6 +1166,14 @@ mule_session_update(
 
     }
 
+    if (ms->timers.manage_public_files <= now){
+      
+      mule_session_manage_public_files(ms);
+
+      ms->timers.manage_public_files = now + SEC2MS(1);
+
+    }
+
     if (ms->timers.manage_inactive_sources <= now){
 
       mule_session_disconnect_inactive_sources(ms);
@@ -1081,7 +1232,7 @@ mule_session_new_connection(
     // This situation shouldn't happen, sources for incomming
     // connections always should be added before actual
     // incomming connection hapenning, and if source will be created
-    // here port will be set to incomming connection port
+    // here, port will be set to incomming connection port
     // instead of source listen port which is wrong.
     
     if (!msc){
@@ -1367,6 +1518,99 @@ mule_session_add_source_for_tcp_fw_check(
     }
 
     result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_add_source(
+        
+       )
+{
+  bool result = false;
+
+  do {
+
+  result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_session_create_file(
+                         UINT128* id,
+                         char* name,
+                         char* path,
+                         uint8_t* data,
+                         uint64_t size,
+                         CIPHER_CALLBACKS* ccbs,
+                         MULE_FILE** mf_out
+                        )
+{
+  bool result = false;
+
+  do {
+
+    result = mule_file_create(id, name, path, data, size, ccbs, mf_out);
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_session_add_source_to_file(
+                                MULE_FILE* mf,
+                                uint8_t type,
+                                UINT128* id,
+                                uint32_t ip4_no,
+                                uint16_t tcp_port_no,
+                                uint16_t udp_port_no,
+                                uint8_t cipher_opts
+                               )
+{
+  bool result = false;
+
+  do {
+
+   result = mule_file_add_source(mf, type, id, ip4_no, tcp_port_no, udp_port_no, cipher_opts);
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mule_session_add_pub_file(
+                          MULE_SESSION* ms,
+                          MULE_FILE* mf
+                         )
+{
+  bool result = false;
+
+#ifdef CONFIG_VERBOSE
+  uint32_t count = 0;
+#endif
+
+  do {
+
+    if (!ms || !mf) break;
+
+    result = list_add_entry(&ms->pub_files, mf);
+
+    if (!result) break;
+
+#ifdef CONFIG_VERBOSE
+    list_entries_count(mf->sources, &count);
+#endif
+
+    LOG_DEBUG("Mule file %s added for download/upload with %d sources.", mf->name, count);
+
+    LOG_DEBUG_UINT128("File id: ", ((UINT128*)&mf->id));
 
   } while (false);
 

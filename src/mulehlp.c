@@ -5,6 +5,7 @@
 #include <queue.h>
 #include <uint128.h>
 #include <mule.h>
+#include <mulefile.h>
 #include <mulesrc.h>
 #include <muleses.h>
 #include <muleqpkt.h>
@@ -151,6 +152,33 @@ mulehlp_destroy_sources_list(
 }
 
 bool
+mulehlp_destroy_pub_files_list(
+                               MULE_SESSION* ms
+                              )
+{
+  bool result = false;
+  MULE_FILE* mf = NULL;
+
+  do {
+
+    if (!ms) break;
+
+    LIST_EACH_ENTRY_WITH_DATA_BEGIN(ms->pub_files, e, mf);
+
+      mule_file_destroy(mf);
+
+    LIST_EACH_ENTRY_WITH_DATA_END(e);
+
+    list_destroy(ms->pub_files, false);
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
 mulehlp_queue_hello_pkt(
                         MULE_SESSION* ms,
                         MULE_SOURCE* msc,
@@ -249,6 +277,184 @@ mulehlp_queue_udp_fw_chk_pkt(
                                                pkt,
                                                pkt_len
                                               );
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mulehlp_queue_file_request_pkt(
+                               MULE_SESSION* ms,
+                               MULE_SOURCE* msc,
+                               MULE_FILE* mf,
+                               uint32_t* sent_flags_out
+                              )
+{
+  bool result = false;
+  void* pkt = NULL;
+  uint32_t pkt_len = 0;
+  uint32_t sent_flags = 0;
+
+  do {
+
+    if (msc->info.misc_opts_1.multi_packet){
+
+      if (!mulepkt_create_mp_file_request(msc, mf, &pkt, &pkt_len, &sent_flags)){
+
+        LOG_ERROR("Failed to create multi packet file request.");
+
+        break;
+
+      }
+
+      result = mule_session_create_queue_out_pkt(
+                                                 ms,
+                                                 PACKET_ACTION_SEND_DATA,
+                                                 msc->ip4_no,
+                                                 msc->tcp_port_no,
+                                                 msc->fd,
+                                                 pkt,
+                                                 pkt_len
+                                                );
+    } else {
+
+      // OP_REQUESTFILENAME
+
+      if (!mulepkt_create_file_name_request(msc, mf, &pkt, &pkt_len)){
+
+        LOG_ERROR("Failed to create request file name packet.");
+
+        break;
+
+      }
+
+      if (!mule_session_create_queue_out_pkt(
+                                             ms,
+                                             PACKET_ACTION_SEND_DATA,
+                                             msc->ip4_no,
+                                             msc->tcp_port_no,
+                                             msc->fd,
+                                             pkt,
+                                             pkt_len
+                                            )
+      ){
+
+        LOG_ERROR("Failed to queue tcp packet.");
+
+        break;
+
+      }
+
+      sent_flags |= MULE_SOURCE_FLAG_FILE_NAME;
+
+      if (mf->part_count > 1){
+
+        // OP_SETREQFILEID
+      
+        if (!mulepkt_create_file_hash_set_request(msc, mf, &pkt, &pkt_len)){
+
+          LOG_ERROR("Failed to create file hash set request packet.");
+
+          break;
+
+        }
+
+        if (!mule_session_create_queue_out_pkt(
+                                               ms,
+                                               PACKET_ACTION_SEND_DATA,
+                                               msc->ip4_no,
+                                               msc->tcp_port_no,
+                                               msc->fd,
+                                               pkt,
+                                               pkt_len
+                                              )
+        ){
+
+          LOG_ERROR("Failed to queue tcp packet.");
+
+          break;
+
+        }
+
+        sent_flags |= MULE_SOURCE_FLAG_FILE_STATUS;
+
+      }
+
+      if (msc->info.misc_opts_1.AICH_ver & 1){
+
+        // OP_AICHFILEHASHREQ
+        
+        if (!mule_pkt_create_AICH_request(msc, mf, &pkt, &pkt_len)){
+
+          LOG_ERROR("Failed to create file AICH request packet.");
+
+          break;
+
+        }
+
+        if (!mule_session_create_queue_out_pkt(
+                                               ms,
+                                               PACKET_ACTION_SEND_DATA,
+                                               msc->ip4_no,
+                                               msc->tcp_port_no,
+                                               msc->fd,
+                                               pkt,
+                                               pkt_len
+                                              )
+        ){
+
+          LOG_ERROR("Failed to queue tcp packet.");
+
+          break;
+
+        }
+
+        sent_flags |= MULE_SOURCE_FLAG_AICH_HASH;
+
+      }
+
+    }
+
+    *sent_flags_out = sent_flags;
+
+    result = true;
+
+  } while (false);
+
+  return result;
+}
+
+bool
+mulehlp_pub_file_by_id(
+                       MULE_SESSION* ms,
+                       UINT128* id,
+                       MULE_FILE** mf_out
+                      )
+{
+  bool result = false;
+  MULE_FILE* mf = NULL;
+  bool found = false;
+
+  do {
+
+    LIST_EACH_ENTRY_WITH_DATA_BEGIN(ms->pub_files, e, mf);
+
+      if (0 == uint128_compare(id, &mf->id)){
+
+        if (mf_out) *mf_out = mf;
+
+        found = true;
+
+        break;
+
+      }
+
+    LIST_EACH_ENTRY_WITH_DATA_END(e);
+
+    if (!found) break;
+
+    result = true;
 
   } while (false);
 

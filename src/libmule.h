@@ -18,6 +18,10 @@ typedef struct _kad_session_status {
 #ifndef MULE_SESSION_DEFINED
 #define MULE_SESSION_DEFINED
 
+typedef struct _uint128 UINT128;
+
+typedef struct _mule_file MULE_FILE;
+
 typedef struct _mule_session MULE_SESSION;
 
 #endif
@@ -174,5 +178,32 @@ mule_session_add_source_for_tcp_fw_check(
                                          uint16_t tcp_port_no,
                                          uint16_t udp_port_no
                                         );
+
+bool
+mule_session_create_file(
+                         UINT128* id,
+                         char* name,
+                         char* path,
+                         uint8_t* data,
+                         uint64_t size,
+                         CIPHER_CALLBACKS* ccbs,
+                         MULE_FILE** mf_out
+                        );
+bool
+mule_session_add_source_to_file(
+                                MULE_FILE* mf,
+                                uint8_t type,
+                                UINT128* id,
+                                uint32_t ip4_no,
+                                uint16_t tcp_port_no,
+                                uint16_t udp_port_no,
+                                uint8_t cipher_opts
+                               );
+
+bool
+mule_session_add_pub_file(
+                          MULE_SESSION* ms,
+                          MULE_FILE* mf
+                         );
 
 #endif // _LIBMULE_H_

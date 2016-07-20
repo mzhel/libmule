@@ -5,6 +5,7 @@
 #include <list.h>
 #include <queue.h>
 #include <mule.h>
+#include <mulefile.h>
 #include <mulesrc.h>
 #include <muleses.h>
 #include <muleqpkt.h>
